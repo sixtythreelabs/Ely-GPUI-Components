@@ -200,6 +200,7 @@ fn caption_buttons(
                 .w(theme.caption_button_width())
                 .h(height)
                 .debug_selector(move || format!("caption-{control:?}"))
+                .occlude()
                 .window_control_area(area)
                 .hover(|style| style.bg(hover))
                 .on_mouse_down(MouseButton::Left, move |_, window, cx| {
