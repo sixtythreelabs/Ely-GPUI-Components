@@ -183,6 +183,9 @@ fn caption_buttons(
         .flex_none()
         .children(buttons.map(|(control, icon, area)| {
             let on_close = on_close.clone();
+            // Ely runs the press where Windows does not: fullscreen, other systems, a replaced close.
+            let ours = !cfg!(target_os = "windows")
+                || matches!(control, Control::Close) && on_close.is_some();
             let group = SharedString::from(format!("caption-{control:?}"));
             let (hover, glyph) = match control {
                 Control::Close => (colors.danger, colors.on_accent),
@@ -199,11 +202,17 @@ fn caption_buttons(
                 .debug_selector(move || format!("caption-{control:?}"))
                 .window_control_area(area)
                 .hover(|style| style.bg(hover))
-                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                     window.prevent_default();
-                    cx.stop_propagation();
+                    if ours || window.is_fullscreen() {
+                        cx.stop_propagation();
+                    }
                 })
-                .on_click(move |_, window, cx| run(control, on_close.as_ref(), window, cx))
+                .on_click(move |_, window, cx| {
+                    if ours || window.is_fullscreen() {
+                        run(control, on_close.as_ref(), window, cx);
+                    }
+                })
                 .child(
                     Icon::new(icon)
                         .size(IconSize::Sm)
