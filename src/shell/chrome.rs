@@ -241,7 +241,10 @@ fn round_buttons(
                         .rounded_full()
                         .bg(colors.hover)
                         .hover(|style| style.bg(colors.active))
-                        .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                        .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                            window.prevent_default();
+                            cx.stop_propagation();
+                        })
                         .on_click(move |_, window, cx| run(control, on_close.as_ref(), window, cx))
                         .child(Icon::new(icon).size(IconSize::Xs).color(colors.fg))
                 }),
