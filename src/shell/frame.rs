@@ -1,16 +1,23 @@
 use gpui::{
     AnyElement, App, Bounds, CursorStyle, Decorations, HitboxBehavior, IntoElement, MouseButton,
-    ParentElement, Pixels, Point, RenderOnce, ResizeEdge, Size, Styled, Window, canvas, div, point,
-    prelude::*,
+    ParentElement, Pixels, Point, RenderOnce, ResizeEdge, Size, Styled, Tiling, Window, canvas,
+    div, point, prelude::*,
 };
 use smallvec::SmallVec;
 
 use crate::theme::{ActiveTheme, Elevation, Radius};
 
-/// Which edge or corner `pos` grabs, within `inset` of the window's rim.
-fn resize_edge(pos: Point<Pixels>, inset: Pixels, size: Size<Pixels>) -> Option<ResizeEdge> {
-    let (top, bottom) = (pos.y < inset, pos.y > size.height - inset);
-    let (left, right) = (pos.x < inset, pos.x > size.width - inset);
+/// Which edge or corner `pos` grabs, within `inset` of the window's rim; tiled sides grab none.
+fn resize_edge(
+    pos: Point<Pixels>,
+    inset: Pixels,
+    size: Size<Pixels>,
+    tiling: Tiling,
+) -> Option<ResizeEdge> {
+    let top = !tiling.top && pos.y < inset;
+    let bottom = !tiling.bottom && pos.y > size.height - inset;
+    let left = !tiling.left && pos.x < inset;
+    let right = !tiling.right && pos.x > size.width - inset;
     Some(match (top, bottom, left, right) {
         (true, _, true, _) => ResizeEdge::TopLeft,
         (true, _, _, true) => ResizeEdge::TopRight,
@@ -67,15 +74,17 @@ impl RenderOnce for ResizeBorder {
             .child(
                 canvas(
                     |_, window, _| {
-                        let size = window.window_bounds().get_bounds().size;
+                        let size = window.viewport_size();
                         window.insert_hitbox(
                             Bounds::new(point(Pixels::ZERO, Pixels::ZERO), size),
                             HitboxBehavior::Normal,
                         )
                     },
                     move |_, hitbox, window, _| {
-                        let size = window.window_bounds().get_bounds().size;
-                        if let Some(edge) = resize_edge(window.mouse_position(), inset, size) {
+                        let size = window.viewport_size();
+                        if let Some(edge) =
+                            resize_edge(window.mouse_position(), inset, size, tiling)
+                        {
                             window.set_cursor_style(cursor(edge), &hitbox);
                         }
                     },
@@ -89,8 +98,8 @@ impl RenderOnce for ResizeBorder {
             .when(!tiling.right, |edge| edge.pr(inset))
             .on_mouse_move(|_, window, _| window.refresh())
             .on_mouse_down(MouseButton::Left, move |event, window, _| {
-                let size = window.window_bounds().get_bounds().size;
-                if let Some(edge) = resize_edge(event.position, inset, size) {
+                let size = window.viewport_size();
+                if let Some(edge) = resize_edge(event.position, inset, size, tiling) {
                     log::info!("window: resize from {edge:?}");
                     window.start_window_resize(edge);
                 }
@@ -116,14 +125,15 @@ impl RenderOnce for ResizeBorder {
 
 #[cfg(test)]
 mod tests {
-    use gpui::{ResizeEdge, point, px, size};
+    use gpui::{ResizeEdge, Tiling, point, px, size};
 
     use super::resize_edge;
 
     #[test]
     fn corners_win_over_edges_and_the_middle_is_free() {
         let window = size(px(400.0), px(300.0));
-        let at = |x: f32, y: f32| resize_edge(point(px(x), px(y)), px(10.0), window);
+        let at =
+            |x: f32, y: f32| resize_edge(point(px(x), px(y)), px(10.0), window, Tiling::default());
         assert_eq!(at(2.0, 2.0), Some(ResizeEdge::TopLeft));
         assert_eq!(at(398.0, 5.0), Some(ResizeEdge::TopRight));
         assert_eq!(at(200.0, 3.0), Some(ResizeEdge::Top));
