@@ -61,6 +61,7 @@ fn run(control: Control, on_close: Option<&OnClose>, window: &mut Window, cx: &m
     log::info!("window controls: {control:?}");
     match (control, on_close) {
         (Control::Minimize, _) => window.minimize_window(),
+        (Control::Maximize, _) if window.is_fullscreen() => window.toggle_fullscreen(),
         (Control::Maximize, _) => window.zoom_window(),
         (Control::Close, Some(close)) => close(window, cx),
         (Control::Close, None) => window.remove_window(),
@@ -147,7 +148,10 @@ fn traffic_lights(
                 .group_hover(group.clone(), |style| {
                     style.text_color(colors.shadow.opacity(0.6))
                 })
-                .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                })
                 .on_click(move |_, window, cx| run(control, on_close.as_ref(), window, cx))
                 .child(glyph)
         }))
@@ -195,7 +199,10 @@ fn caption_buttons(
                 .debug_selector(move || format!("caption-{control:?}"))
                 .window_control_area(area)
                 .hover(|style| style.bg(hover))
-                .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+                .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                })
                 .on_click(move |_, window, cx| run(control, on_close.as_ref(), window, cx))
                 .child(
                     Icon::new(icon)
